@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
 
 package com.thusarakap.flagguesser
 
@@ -9,6 +9,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
@@ -26,11 +28,20 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.google.gson.Gson
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        lateinit var context: Context
+            private set
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        context = applicationContext
         setContent {
             FlagGuesserTheme {
                 val navController = rememberNavController()
@@ -44,6 +55,19 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+}
+
+
+fun readCountriesJsonFromRaw(): String {
+    val inputStream = MainActivity.context.resources.openRawResource(R.raw.countries)
+    val bufferedReader = BufferedReader(InputStreamReader(inputStream))
+    val stringBuilder = StringBuilder()
+    var line: String? = bufferedReader.readLine()
+    while (line != null) {
+        stringBuilder.append(line)
+        line = bufferedReader.readLine()
+    }
+    return stringBuilder.toString()
 }
 
 @Composable
@@ -130,25 +154,32 @@ fun FlagImage(resourceId: Int, modifier: Modifier = Modifier) {
 @Composable
 fun Screen1(navController: NavHostController) {
     val flagImageId by remember { mutableStateOf(getRandomFlagResourceId()) }
+    val countryNames by remember { mutableStateOf(loadCountryNames()) }
 
     Scaffold(
         topBar = { TopBar(navController) },
         content = {
             Column(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Guess the Country")
-                Spacer(modifier = Modifier.height(16.dp))
                 FlagImage(flagImageId, modifier = Modifier.size(200.dp))
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { /* submit action */ }) {
-                    Text("tree")
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                ) {
+                    items(countryNames) { countryName ->
+                        Text(countryName)
+                    }
                 }
             }
         }
     )
+}
+
+fun loadCountryNames(): List<String> {
+    val countriesJson = readCountriesJsonFromRaw()
+    val gson = Gson()
+    val countryNamesMap: Map<String, String> = gson.fromJson(countriesJson, Map::class.java) as Map<String, String>
+    return countryNamesMap.values.toList()
 }
 
 
