@@ -1,4 +1,6 @@
-@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class)
+@file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3Api::class
+)
 
 package com.thusarakap.flagguesser
 
@@ -8,6 +10,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,12 +18,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,20 +34,15 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.google.gson.Gson
+import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
+import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
+
 
 class MainActivity : ComponentActivity() {
-    companion object {
-        lateinit var context: Context
-            private set
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        context = applicationContext
         setContent {
             FlagGuesserTheme {
                 val navController = rememberNavController()
@@ -55,19 +56,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}
-
-
-fun readCountriesJsonFromRaw(): String {
-    val inputStream = MainActivity.context.resources.openRawResource(R.raw.countries)
-    val bufferedReader = BufferedReader(InputStreamReader(inputStream))
-    val stringBuilder = StringBuilder()
-    var line: String? = bufferedReader.readLine()
-    while (line != null) {
-        stringBuilder.append(line)
-        line = bufferedReader.readLine()
-    }
-    return stringBuilder.toString()
 }
 
 @Composable
@@ -141,7 +129,8 @@ fun MainMenu(navController: NavHostController) {
 }
 
 @Composable
-fun FlagImage(resourceId: Int, modifier: Modifier = Modifier) {
+fun FlagImage(countryCode: String, modifier: Modifier = Modifier) {
+    val resourceId = getFlagResourceIdByCountryCode(countryCode)
     val flagImage: Painter = painterResource(id = resourceId)
     Image(
         painter = flagImage,
@@ -150,24 +139,85 @@ fun FlagImage(resourceId: Int, modifier: Modifier = Modifier) {
     )
 }
 
+fun getFlagResourceIdByCountryCode(countryCode: String): Int {
+    return when (countryCode) {
+        "FR" -> R.drawable.fr
+        "EU" -> R.drawable.eu
+        "AE" -> R.drawable.ae
+        "ES" -> R.drawable.es
+        // Add more cases for other country codes here
+        else -> R.drawable.gb // Default flag resource ID
+    }
+}
+
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun Screen1(navController: NavHostController) {
-    val flagImageId by remember { mutableStateOf(getRandomFlagResourceId()) }
-    val countryNames by remember { mutableStateOf(loadCountryNames()) }
+    var selectedCountry by remember { mutableStateOf("") }
+    var countryNames by remember { mutableStateOf<List<String>>(emptyList()) }
+    var flagCountryCode by remember { mutableStateOf("") }
+    var isCorrect by remember { mutableStateOf<Boolean?>(null) }
+    var correctCountry by remember { mutableStateOf("") }
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        countryNames = loadCountryNames(context)
+        flagCountryCode = getRandomFlagCountryCode()
+        correctCountry = getCountryNameByCountryCode(flagCountryCode)
+    }
 
     Scaffold(
         topBar = { TopBar(navController) },
         content = {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.Top,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                FlagImage(flagImageId, modifier = Modifier.size(200.dp))
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                ) {
-                    items(countryNames) { countryName ->
-                        Text(countryName)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Flag Image
+                FlagImage(countryCode = flagCountryCode, modifier = Modifier.size(200.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Selected Country
+                Text("Selected Country: $selectedCountry")
+
+                // Country List
+                if (countryNames.isNotEmpty()) {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        items(countryNames) { countryCode ->
+                            CountryListItem(countryCode = countryCode, selectedCountry = selectedCountry) {
+                                selectedCountry = it
+                            }
+                        }
+                    }
+                } else {
+                    // Show loading indicator or placeholder
+                    CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
+                }
+
+                // Submit Button
+                Button(onClick = {
+                    // Inside the onClick lambda of the submit button
+                    isCorrect = selectedCountry == correctCountry
+                }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
+                    Text("Submit")
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Result Popup
+                isCorrect?.let {
+                    ResultPopup(isCorrect = it) {
+                        isCorrect = null
+                        selectedCountry = ""
+                        flagCountryCode = getRandomFlagCountryCode()
+                        correctCountry = getCountryNameByCountryCode(flagCountryCode)
                     }
                 }
             }
@@ -175,24 +225,98 @@ fun Screen1(navController: NavHostController) {
     )
 }
 
-fun loadCountryNames(): List<String> {
-    val countriesJson = readCountriesJsonFromRaw()
-    val gson = Gson()
-    val countryNamesMap: Map<String, String> = gson.fromJson(countriesJson, Map::class.java) as Map<String, String>
-    return countryNamesMap.values.toList()
+
+
+
+
+
+@Composable
+fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Text(
+                text = if (isCorrect) "Correct Answer" else "Incorrect Answer",
+            )
+        },
+        text = {
+            Text(
+                text = if (isCorrect) "Congratulations! Your answer is correct." else "Oops! Your answer is incorrect.",
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { onDismiss() }
+            ) {
+                Text("OK")
+            }
+        }
+    )
+}
+
+fun getCountryNameByCountryCode(countryCode: String): String {
+    return when (countryCode) {
+        "FR" -> "France"
+        "GB" -> "United Kingdom"
+        "EU" -> "European Union"
+        "AE" -> "United Arab Emirates"
+        "ES" -> "Spain"
+        // Add more cases for other country codes here
+        else -> "Unknown"
+    }
+}
+
+fun getRandomFlagCountryCode(): String {
+    val countryCodes = listOf(
+        "FR", "EU", "AE", "ES", "GB"
+        // Add more country codes here as needed
+    )
+    return countryCodes.random()
+}
+
+@Composable
+fun CountryListItem(
+    countryCode: String,
+    selectedCountry: String,
+    onCountrySelected: (String) -> Unit
+) {
+    val countryName = getCountryNameByCountryCode(countryCode)
+    Surface(
+        color = if (countryName == selectedCountry) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .clickable { onCountrySelected(countryName) },
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = countryName,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
 }
 
 
-fun getRandomFlagResourceId(): Int {
-    val drawableResources = listOf(
-        R.drawable.fr,
-        R.drawable.eu,
-        R.drawable.ae,
-        R.drawable.es,
-        R.drawable.gb
-        // Add more drawable resource IDs here as needed
-    )
-    return drawableResources.random()
+
+fun loadCountryNames(context: Context): List<String> {
+    val jsonString = getJsonStringFromAssets(context, "countries.json")
+    val jsonObject = JSONObject(jsonString)
+    return jsonObject.keys().asSequence().toList()
+}
+
+fun getJsonStringFromAssets(context: Context, fileName: String): String {
+    val inputStream = context.assets.open(fileName)
+    val reader = BufferedReader(InputStreamReader(inputStream))
+    val stringBuilder = StringBuilder()
+    var line: String?
+    while (reader.readLine().also { line = it } != null) {
+        stringBuilder.append(line)
+    }
+    inputStream.close()
+    return stringBuilder.toString()
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
