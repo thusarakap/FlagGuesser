@@ -1,4 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3Api::class, ExperimentalMaterial3Api::class,
     ExperimentalMaterial3Api::class
 )
 
@@ -7,6 +9,7 @@ package com.thusarakap.flagguesser
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -35,9 +38,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
+import kotlinx.coroutines.delay
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.Locale
 
 
 class MainActivity : ComponentActivity() {
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(navController: NavHostController) {
     TopAppBar(
@@ -128,28 +134,6 @@ fun MainMenu(navController: NavHostController) {
     )
 }
 
-@Composable
-fun FlagImage(countryCode: String, modifier: Modifier = Modifier) {
-    val resourceId = getFlagResourceIdByCountryCode(countryCode)
-    val flagImage: Painter = painterResource(id = resourceId)
-    Image(
-        painter = flagImage,
-        contentDescription = "Flag",
-        modifier = modifier
-    )
-}
-
-fun getFlagResourceIdByCountryCode(countryCode: String): Int {
-    return when (countryCode) {
-        "FR" -> R.drawable.fr
-        "EU" -> R.drawable.eu
-        "AE" -> R.drawable.ae
-        "ES" -> R.drawable.es
-        // Add more cases for other country codes here
-        else -> R.drawable.gb // Default flag resource ID
-    }
-}
-
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun Screen1(navController: NavHostController) {
@@ -158,13 +142,13 @@ fun Screen1(navController: NavHostController) {
     var flagCountryCode by remember { mutableStateOf("") }
     var isCorrect by remember { mutableStateOf<Boolean?>(null) }
     var correctCountry by remember { mutableStateOf("") }
+    var resultPopupShown by remember { mutableStateOf(false) }
+    var wasPopupShown by remember { mutableStateOf(false) } // New state variable to track if the popup was shown
 
-    val context = LocalContext.current
-    LaunchedEffect(Unit) {
-        countryNames = loadCountryNames(context)
-        flagCountryCode = getRandomFlagCountryCode()
-        correctCountry = getCountryNameByCountryCode(flagCountryCode)
-    }
+    // Fetch country names synchronously
+    countryNames = loadCountryNames(LocalContext.current)
+    flagCountryCode = getRandomFlagCountryCode(LocalContext.current)
+    correctCountry = getCountryNameByCountryCode(LocalContext.current, flagCountryCode)
 
     Scaffold(
         topBar = { TopBar(navController) },
@@ -201,23 +185,37 @@ fun Screen1(navController: NavHostController) {
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
                 }
 
+                val buttonText = if (wasPopupShown) "Next" else "Submit"
+
                 // Submit Button
                 Button(onClick = {
-                    // Inside the onClick lambda of the submit button
-                    isCorrect = selectedCountry == correctCountry
+                    if (wasPopupShown) {
+                        // Load a new flag and continue the game
+                        navController.navigate("screen1")
+                        isCorrect = null
+                        wasPopupShown = false
+                    } else {
+                        // Inside the onClick lambda of the submit button
+                        isCorrect = selectedCountry.equals(correctCountry, ignoreCase = true)
+                        Log.d("Answer Comparison", "Selected: $selectedCountry, Correct: $correctCountry, Result: $isCorrect")
+                        resultPopupShown = true
+                    }
                 }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                    Text("Submit")
+                    Text(buttonText)
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Result Popup
-                isCorrect?.let {
-                    ResultPopup(isCorrect = it) {
-                        isCorrect = null
-                        selectedCountry = ""
-                        flagCountryCode = getRandomFlagCountryCode()
-                        correctCountry = getCountryNameByCountryCode(flagCountryCode)
+                if (resultPopupShown) {
+                    LaunchedEffect(isCorrect) {
+                        // Show the result popup for 2 seconds
+                        delay(2000)
+                        resultPopupShown = false
+                        wasPopupShown = true // Set the state to indicate that the popup was shown
+                    }
+                    ResultPopup(isCorrect ?: false, correctCountry) {
+                        resultPopupShown = false
                     }
                 }
             }
@@ -225,13 +223,8 @@ fun Screen1(navController: NavHostController) {
     )
 }
 
-
-
-
-
-
 @Composable
-fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
+fun ResultPopup(isCorrect: Boolean, correctAnswer: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { onDismiss() },
         title = {
@@ -240,9 +233,15 @@ fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
             )
         },
         text = {
-            Text(
-                text = if (isCorrect) "Congratulations! Your answer is correct." else "Oops! Your answer is incorrect.",
-            )
+            if (isCorrect) {
+                Text(
+                    text = "Congratulations! Your answer is correct."
+                )
+            } else {
+                Text(
+                    text = "The correct answer is: $correctAnswer"
+                )
+            }
         },
         confirmButton = {
             Button(
@@ -254,24 +253,46 @@ fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
     )
 }
 
-fun getCountryNameByCountryCode(countryCode: String): String {
-    return when (countryCode) {
-        "FR" -> "France"
-        "GB" -> "United Kingdom"
-        "EU" -> "European Union"
-        "AE" -> "United Arab Emirates"
-        "ES" -> "Spain"
-        // Add more cases for other country codes here
-        else -> "Unknown"
-    }
+@Composable
+fun FlagImage(countryCode: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current // Get the context
+    val resourceId = getFlagResourceIdByCountryCode(context, countryCode)
+    val flagImage: Painter = painterResource(id = resourceId)
+    Image(
+        painter = flagImage,
+        contentDescription = "Flag",
+        modifier = modifier
+    )
 }
 
-fun getRandomFlagCountryCode(): String {
-    val countryCodes = listOf(
-        "FR", "EU", "AE", "ES", "GB"
-        // Add more country codes here as needed
-    )
-    return countryCodes.random()
+fun getFlagResourceIdByCountryCode(context: Context, countryCode: String): Int {
+    val jsonString = getJsonStringFromAssets(context, "countries.json")
+    val jsonObject = JSONObject(jsonString)
+    val countryName = jsonObject.optString(countryCode, "Unknown")
+    val drawableName = countryCode.toLowerCase(Locale.ROOT)
+
+    // Log the country and drawable names
+    Log.d("Country and Drawable", "Country: $countryName, Drawable: $drawableName")
+
+    return context.resources.getIdentifier(drawableName, "drawable", context.packageName)
+}
+
+
+fun getCountryNameByCountryCode(context: Context, countryCode: String): String {
+    val jsonString = getJsonStringFromAssets(context, "countries.json")
+    val jsonObject = JSONObject(jsonString)
+    return jsonObject.optString(countryCode, "Unknown")
+}
+
+fun getRandomFlagCountryCode(context: Context): String {
+    val jsonString = getJsonStringFromAssets(context, "countries.json")
+    val jsonObject = JSONObject(jsonString)
+    val countryCodes = jsonObject.keys().asSequence().toList()
+
+    val randomCountryCode = countryCodes.random()
+    Log.d("RandomCountryCode", "Selected Country Code: $randomCountryCode")
+
+    return randomCountryCode
 }
 
 @Composable
@@ -280,7 +301,7 @@ fun CountryListItem(
     selectedCountry: String,
     onCountrySelected: (String) -> Unit
 ) {
-    val countryName = getCountryNameByCountryCode(countryCode)
+    val countryName = getCountryNameByCountryCode(LocalContext.current, countryCode)
     Surface(
         color = if (countryName == selectedCountry) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
     ) {
@@ -299,8 +320,6 @@ fun CountryListItem(
     }
 }
 
-
-
 fun loadCountryNames(context: Context): List<String> {
     val jsonString = getJsonStringFromAssets(context, "countries.json")
     val jsonObject = JSONObject(jsonString)
@@ -318,6 +337,30 @@ fun getJsonStringFromAssets(context: Context, fileName: String): String {
     inputStream.close()
     return stringBuilder.toString()
 }
+
+//@Composable
+//fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
+//    AlertDialog(
+//        onDismissRequest = { onDismiss() },
+//        title = {
+//            Text(
+//                text = if (isCorrect) "Correct Answer" else "Incorrect Answer",
+//            )
+//        },
+//        text = {
+//            Text(
+//                text = if (isCorrect) "Congratulations! Your answer is correct." else "Oops! Your answer is incorrect.",
+//            )
+//        },
+//        confirmButton = {
+//            Button(
+//                onClick = { onDismiss() }
+//            ) {
+//                Text("OK")
+//            }
+//        }
+//    )
+//}
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
@@ -380,6 +423,18 @@ fun Screen4(navController: NavHostController) {
             }
         }
     )
+}
+
+// Previews
+@Preview(showBackground = true)
+@Composable
+fun Screen1Preview() {
+    val navController = rememberNavController()
+    FlagGuesserTheme {
+        Surface {
+            Screen1(navController = navController)
+        }
+    }
 }
 
 @Preview(showBackground = true)
