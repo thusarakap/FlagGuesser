@@ -28,9 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
@@ -43,7 +45,6 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.Locale
-
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -224,23 +225,24 @@ fun Screen1(navController: NavHostController) {
 }
 
 @Composable
-fun ResultPopup(isCorrect: Boolean, correctAnswer: String, onDismiss: () -> Unit) {
+fun ResultPopup(isCorrect: Boolean, correctCountry: String, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { onDismiss() },
         title = {
             Text(
-                text = if (isCorrect) "Correct Answer" else "Incorrect Answer",
+                text = if (isCorrect) "CORRECT!" else "WRONG!",
+                color = if (isCorrect) Color.Green else Color.Red
             )
         },
         text = {
-            if (isCorrect) {
+            if (!isCorrect) {
                 Text(
-                    text = "Congratulations! Your answer is correct."
+                    text = correctCountry,
+                    color = Color.Blue
                 )
             } else {
-                Text(
-                    text = "The correct answer is: $correctAnswer"
-                )
+                // Empty Text composable for correct answers
+                Text(text = "")
             }
         },
         confirmButton = {
@@ -252,6 +254,7 @@ fun ResultPopup(isCorrect: Boolean, correctAnswer: String, onDismiss: () -> Unit
         }
     )
 }
+
 
 @Composable
 fun FlagImage(countryCode: String, modifier: Modifier = Modifier) {
@@ -337,30 +340,6 @@ fun getJsonStringFromAssets(context: Context, fileName: String): String {
     inputStream.close()
     return stringBuilder.toString()
 }
-
-//@Composable
-//fun ResultPopup(isCorrect: Boolean, onDismiss: () -> Unit) {
-//    AlertDialog(
-//        onDismissRequest = { onDismiss() },
-//        title = {
-//            Text(
-//                text = if (isCorrect) "Correct Answer" else "Incorrect Answer",
-//            )
-//        },
-//        text = {
-//            Text(
-//                text = if (isCorrect) "Congratulations! Your answer is correct." else "Oops! Your answer is incorrect.",
-//            )
-//        },
-//        confirmButton = {
-//            Button(
-//                onClick = { onDismiss() }
-//            ) {
-//                Text("OK")
-//            }
-//        }
-//    )
-//}
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
