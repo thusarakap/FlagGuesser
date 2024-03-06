@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -45,8 +47,21 @@ import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.Locale
+import java.util.UUID
+
+class FlagViewModel : ViewModel() {
+    var selectedCountry by mutableStateOf("")
+    var countryNames by mutableStateOf<List<String>>(emptyList())
+    var flagCountryCode by mutableStateOf("")
+    var isCorrect by mutableStateOf<Boolean?>(null)
+    var correctCountry by mutableStateOf("")
+    var resultPopupShown by mutableStateOf(false)
+    var wasPopupShown by mutableStateOf(false)
+}
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: FlagViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -54,7 +69,11 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(navController, startDestination = "menu") {
                     composable("menu") { MainMenu(navController) }
-                    composable("screen1") { Screen1(navController) }
+                    composable("screen1") {
+                        // Generate a random UUID as the key
+                        val key = remember { UUID.randomUUID().toString() }
+                        Screen1(navController, viewModel, applicationContext) // pass applicationContext
+                    }
                     composable("screen2") { Screen2(navController) }
                     composable("screen3") { Screen3(navController) }
                     composable("screen4") { Screen4(navController) }
@@ -63,6 +82,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,7 +94,7 @@ fun TopBar(navController: NavHostController) {
         ),
         title = { Text("Menu") },
         navigationIcon = {
-            IconButton(onClick = { navController.navigateUp() }) {
+            IconButton(onClick = { navController.navigate("menu") }) {
                 Icon(
                     imageVector = Icons.Filled.ArrowBack,
                     contentDescription = "Back"
@@ -137,19 +157,19 @@ fun MainMenu(navController: NavHostController) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen1(navController: NavHostController) {
-    var selectedCountry by remember { mutableStateOf("") }
-    var countryNames by remember { mutableStateOf<List<String>>(emptyList()) }
-    var flagCountryCode by remember { mutableStateOf("") }
-    var isCorrect by remember { mutableStateOf<Boolean?>(null) }
-    var correctCountry by remember { mutableStateOf("") }
-    var resultPopupShown by remember { mutableStateOf(false) }
-    var wasPopupShown by remember { mutableStateOf(false) } // New state variable to track if the popup was shown
-
+fun Screen1(navController: NavHostController, viewModel: FlagViewModel, context: Context) {
     // Fetch country names synchronously
-    countryNames = loadCountryNames(LocalContext.current)
-    flagCountryCode = getRandomFlagCountryCode(LocalContext.current)
-    correctCountry = getCountryNameByCountryCode(LocalContext.current, flagCountryCode)
+    if (viewModel.countryNames.isEmpty()) {
+        viewModel.countryNames = loadCountryNames(context)
+    }
+
+    // Update flag country code every time Screen1 recomposes
+    viewModel.flagCountryCode = getRandomFlagCountryCode(context)
+
+    // Update correct country whenever flag country code changes
+    LaunchedEffect(viewModel.flagCountryCode) {
+        viewModel.correctCountry = getCountryNameByCountryCode(context, viewModel.flagCountryCode)
+    }
 
     Scaffold(
         topBar = { TopBar(navController) },
@@ -164,20 +184,20 @@ fun Screen1(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Flag Image
-                FlagImage(countryCode = flagCountryCode, modifier = Modifier.size(200.dp))
+                FlagImage(countryCode = viewModel.flagCountryCode, modifier = Modifier.size(200.dp))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Selected Country
-                Text("Selected Country: $selectedCountry")
+                Text("Selected Country: ${viewModel.selectedCountry}")
 
                 // Country List
-                if (countryNames.isNotEmpty()) {
+                if (viewModel.countryNames.isNotEmpty()) {
                     LazyColumn(
                         modifier = Modifier.weight(1f)
                     ) {
-                        items(countryNames) { countryCode ->
-                            CountryListItem(countryCode = countryCode, selectedCountry = selectedCountry) {
-                                selectedCountry = it
+                        items(viewModel.countryNames) { countryCode ->
+                            CountryListItem(countryCode = countryCode, selectedCountry = viewModel.selectedCountry) {
+                                viewModel.selectedCountry = it
                             }
                         }
                     }
@@ -186,20 +206,20 @@ fun Screen1(navController: NavHostController) {
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
                 }
 
-                val buttonText = if (wasPopupShown) "Next" else "Submit"
+                val buttonText = if (viewModel.wasPopupShown) "Next" else "Submit"
 
                 // Submit Button
                 Button(onClick = {
-                    if (wasPopupShown) {
+                    if (viewModel.wasPopupShown) {
                         // Load a new flag and continue the game
                         navController.navigate("screen1")
-                        isCorrect = null
-                        wasPopupShown = false
+                        viewModel.isCorrect = null
+                        viewModel.wasPopupShown = false
                     } else {
                         // Inside the onClick lambda of the submit button
-                        isCorrect = selectedCountry.equals(correctCountry, ignoreCase = true)
-                        Log.d("Answer Comparison", "Selected: $selectedCountry, Correct: $correctCountry, Result: $isCorrect")
-                        resultPopupShown = true
+                        viewModel.isCorrect = viewModel.selectedCountry.equals(viewModel.correctCountry, ignoreCase = true)
+                        Log.d("Answer Comparison", "Selected: ${viewModel.selectedCountry}, Correct: ${viewModel.correctCountry}, Result: ${viewModel.isCorrect}")
+                        viewModel.resultPopupShown = true
                     }
                 }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                     Text(buttonText)
@@ -208,15 +228,16 @@ fun Screen1(navController: NavHostController) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Result Popup
-                if (resultPopupShown) {
-                    LaunchedEffect(isCorrect) {
+                if (viewModel.resultPopupShown) {
+                    LaunchedEffect(viewModel.isCorrect) {
                         // Show the result popup for 2 seconds
                         delay(2000)
-                        resultPopupShown = false
-                        wasPopupShown = true // Set the state to indicate that the popup was shown
+                        viewModel.resultPopupShown = false
+                        viewModel.wasPopupShown = true // Set the state to indicate that the popup was shown
                     }
-                    ResultPopup(isCorrect ?: false, correctCountry) {
-                        resultPopupShown = false
+                    ResultPopup(viewModel.isCorrect ?: false, viewModel.correctCountry) {
+                        viewModel.resultPopupShown = false
+                        viewModel.wasPopupShown = true // Update the flag when the popup closes
                     }
                 }
             }
@@ -279,7 +300,6 @@ fun getFlagResourceIdByCountryCode(context: Context, countryCode: String): Int {
 
     return context.resources.getIdentifier(drawableName, "drawable", context.packageName)
 }
-
 
 fun getCountryNameByCountryCode(context: Context, countryCode: String): String {
     val jsonString = getJsonStringFromAssets(context, "countries.json")
@@ -405,16 +425,6 @@ fun Screen4(navController: NavHostController) {
 }
 
 // Previews
-@Preview(showBackground = true)
-@Composable
-fun Screen1Preview() {
-    val navController = rememberNavController()
-    FlagGuesserTheme {
-        Surface {
-            Screen1(navController = navController)
-        }
-    }
-}
 
 @Preview(showBackground = true)
 @Composable
