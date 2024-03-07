@@ -62,6 +62,7 @@ dependencies {
     implementation ("androidx.navigation:navigation-compose:2.7.7")
     implementation ("androidx.compose.foundation:foundation-layout:1.6.2")
     implementation ("com.google.code.gson:gson:2.10")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
     implementation ("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
