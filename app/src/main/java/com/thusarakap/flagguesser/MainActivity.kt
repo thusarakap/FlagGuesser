@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -60,6 +62,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
 import kotlinx.coroutines.delay
+
 
 
 class MainActivity : ComponentActivity() {
@@ -104,14 +107,22 @@ fun TopBar(navController: NavHostController) {
 @Composable
 fun MainMenu(navController: NavHostController) {
     val buttonWidth = 230.dp
+    var isSwitchOn by rememberSaveable { mutableStateOf(false) } // New state variable for the switch
 
     Scaffold(
-        content = { innerPadding ->
+        content = { _ ->
             Column(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Switch UI
+                Switch(
+                    checked = isSwitchOn,
+                    onCheckedChange = { isChecked ->
+                        isSwitchOn = isChecked // Update switch state
+                    }
+                )
                 Text("Menu")
                 Spacer(modifier = Modifier.height(30.dp))
                 Button(
@@ -163,10 +174,9 @@ fun FlagImage(countryCode: String, modifier: Modifier = Modifier) {
 }
 
 fun getFlagImageByCountryCode(countryCode: String): Int {
-    val countryCodeUpperCase = countryCode.toUpperCase()
-    return when (countryCodeUpperCase) {
+    return when (val countryCodeUpperCase = countryCode.uppercase()) {
         in CountryCodeMap.codeToNameMap.keys -> {
-            val countryCodeLowerCase = countryCodeUpperCase.toLowerCase() // Convert to lowercase
+            val countryCodeLowerCase = countryCodeUpperCase.lowercase() // Convert to lowercase
             val drawableName = countryCodeLowerCase.take(2) // Take first two characters
             val resourceId = try {
                 R.drawable::class.java.getField(drawableName).getInt(null)
@@ -195,9 +205,12 @@ fun Screen1(navController: NavHostController) {
     var wasPopupShown by rememberSaveable { mutableStateOf(false) }
     var resultPopupShown by rememberSaveable { mutableStateOf(false) }
 
+
     LaunchedEffect(Unit) {
         countryNames = loadCountryNames()
-        flagCountryCode = getRandomFlagCountryCode()
+        if (flagCountryCode.isEmpty()) {
+            flagCountryCode = getRandomFlagCountryCode()
+        }
         correctCountry = getCountryNameByCountryCode(flagCountryCode)
     }
 
@@ -246,7 +259,7 @@ fun Screen1(navController: NavHostController) {
                     } else {
                         // Inside the onClick lambda of the submit button
                         isCorrect = selectedCountry.equals(correctCountry, ignoreCase = true)
-                        Log.d("Answer Comparison", "Selected: ${selectedCountry}, Correct: ${correctCountry}, Result: ${isCorrect}")
+                        Log.d("Answer Comparison", "Selected: $selectedCountry, Correct: $correctCountry, Result: $isCorrect")
                         resultPopupShown = true
                     }
                 }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
@@ -286,7 +299,7 @@ fun ResultPopup(isCorrect: Boolean, correctCountry: String?, onDismiss: () -> Un
         text = {
             if (!isCorrect && correctCountry != null) {
                 Text(
-                    text = "$correctCountry.",
+                    text = correctCountry,
                     color = Color.Blue,
                     style = TextStyle(fontSize = 22.sp),
                 )
@@ -348,16 +361,59 @@ fun loadCountryNames(): List<String> {
 fun Screen2(navController: NavHostController) {
     var countryCode by rememberSaveable { mutableStateOf("") }
     var countryName by rememberSaveable { mutableStateOf("") }
-    var dashes by rememberSaveable { mutableStateOf<String>("") }
+    var dashes by rememberSaveable { mutableStateOf("") }
     var userInput by rememberSaveable { mutableStateOf("") }
+    var incorrectGuesses by rememberSaveable { mutableStateOf(0) }
+    var resultMessage by rememberSaveable { mutableStateOf("") }
+    var resultPopupShown by rememberSaveable { mutableStateOf(false) }
+    var wasPopupShown by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         // Generate a random flag country code and corresponding country name
-        countryCode = getRandomFlagCountryCode()
+        if (countryCode.isEmpty()) {
+            countryCode = getRandomFlagCountryCode()
+        }
         countryName = getCountryNameByCountryCode(countryCode)
 
         // Initialize the dashes string with spaces between each dash
         dashes = countryName.map { if (it.isWhitespace()) "  " else "- " }.joinToString("")
+    }
+
+    fun handleSubmit(userInput: String) {
+        // Convert the user input to uppercase to make the comparison case-insensitive
+        val inputChar = userInput.uppercase().firstOrNull() ?: return
+
+        // Convert the country name and dashes to char arrays for easy manipulation
+        val countryNameChars = countryName.uppercase().toCharArray()
+        val dashesChars = dashes.replace(" ", "").toCharArray()
+
+        var isGuessCorrect = false
+
+        // Iterate over the country name characters
+        for (i in countryNameChars.indices) {
+            // If the current character is equal to the user input, replace the corresponding dash
+            if (countryNameChars[i] == inputChar) {
+                dashesChars[i] = inputChar
+                isGuessCorrect = true
+            }
+        }
+
+        // Convert the dashes char array back to a string with spaces between each character
+        dashes = dashesChars.joinToString(" ")
+
+        if (!isGuessCorrect) {
+            incorrectGuesses++
+        }
+
+        if (incorrectGuesses >= 3) {
+            resultMessage = "WRONG!"
+            resultPopupShown = true
+            wasPopupShown = true
+        } else if (!dashes.contains('-')) {
+            resultMessage = "CORRECT!"
+            resultPopupShown = true
+            wasPopupShown = true
+        }
     }
 
     Scaffold(
@@ -386,26 +442,55 @@ fun Screen2(navController: NavHostController) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
+                val buttonText = if (wasPopupShown) "Next" else "Submit"
+
                 // Submit Button
-                Button(onClick = { handleSubmit(userInput) }) {
-                    Text("Submit")
+                Button(onClick = {
+                    if (wasPopupShown) {
+                        // Reset the game and load a new flag
+                        navController.navigate("screen2")
+                    } else {
+                        handleSubmit(userInput)
+                    }
+                }) {
+                    Text(buttonText)
+                }
+
+                // Result Popup
+                if (resultPopupShown) {
+                    ResultPopup(isCorrect = resultMessage == "CORRECT!", correctCountry = if (resultMessage == "WRONG!") countryName else null) {
+                        resultPopupShown = false
+                    }
                 }
             }
         }
     )
 }
 
-fun handleSubmit(userInput: String) {
-    // Handle the submission logic here
-    // Update the dashes string based on the user input
-    // Compare userInput with the country name and update dashes if necessary
-    // For example, if userInput is 'C' and the country name is 'Canada',
-    // update dashes to 'C-----'
-}
-
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun Screen3(navController: NavHostController) {
+    var countryCodes by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
+    var correctCountryCode by rememberSaveable { mutableStateOf("") }
+    var correctCountryName by rememberSaveable { mutableStateOf("") }
+    var hasAttempted by rememberSaveable { mutableStateOf(false) }
+    var isCorrect by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        if (countryCodes.isEmpty()) {
+            val generatedCountryCodes = mutableSetOf<String>()
+            while (generatedCountryCodes.size < 3) {
+                val newCountryCode = getRandomFlagCountryCode()
+                generatedCountryCodes.add(newCountryCode)
+            }
+            countryCodes = generatedCountryCodes
+        }
+        if (correctCountryCode.isEmpty()) {
+            correctCountryCode = countryCodes.random()
+        }
+        correctCountryName = getCountryNameByCountryCode(correctCountryCode)
+    }
+
     Scaffold(
         topBar = { TopBar(navController) },
         content = {
@@ -414,10 +499,36 @@ fun Screen3(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Guess the Flag")
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { /* submit action */ }) {
-                    Text("Submit")
+                Spacer(modifier = Modifier.height(40.dp))
+                Text(
+                    text = correctCountryName,
+                    style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                )
+
+                countryCodes.forEach { countryCode ->
+                    FlagImage(countryCode = countryCode, modifier = Modifier
+                        .size(200.dp)
+                        .clickable(enabled = !hasAttempted) {
+                            if (!hasAttempted) {
+                                hasAttempted = true
+                                isCorrect = (countryCode == correctCountryCode)
+                            }
+                        })
+                }
+
+                if (hasAttempted) {
+                    Text(
+                        text = if (isCorrect) "CORRECT!" else "INCORRECT!",
+                        color = if (isCorrect) Color.Green else Color.Red
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(22.dp))
+                }
+
+                Spacer(modifier = Modifier.height(15.dp))
+
+                Button(onClick = { navController.navigate("screen3") }) {
+                    Text("Next")
                 }
             }
         }
@@ -427,6 +538,27 @@ fun Screen3(navController: NavHostController) {
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun Screen4(navController: NavHostController) {
+    var countryCodes by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var userInput1 by rememberSaveable { mutableStateOf("") }
+    var userInput2 by rememberSaveable { mutableStateOf("") }
+    var userInput3 by rememberSaveable { mutableStateOf("") }
+    var isCorrect1 by rememberSaveable { mutableStateOf(false) }
+    var isCorrect2 by rememberSaveable { mutableStateOf(false) }
+    var isCorrect3 by rememberSaveable { mutableStateOf(false) }
+    var isSubmitted by rememberSaveable { mutableStateOf(false) }
+    var incorrectAttempts by rememberSaveable { mutableStateOf(0) } // New state variable
+
+    LaunchedEffect(Unit) {
+        if (countryCodes.isEmpty()) {
+            val generatedCountryCodes = mutableSetOf<String>()
+            while (generatedCountryCodes.size < 3) {
+                val newCountryCode = getRandomFlagCountryCode()
+                generatedCountryCodes.add(newCountryCode)
+            }
+            countryCodes = generatedCountryCodes.toList()
+        }
+    }
+
     Scaffold(
         topBar = { TopBar(navController) },
         content = {
@@ -435,10 +567,80 @@ fun Screen4(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Advanced Level")
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { /* submit action */ }) {
-                    Text("Submit")
+                Spacer(modifier = Modifier.height(30.dp))
+
+                if (countryCodes.size == 3) {
+                    FlagImage(countryCode = countryCodes[0], modifier = Modifier.size(150.dp))
+                    OutlinedTextField(
+                        value = userInput1,
+                        onValueChange = { userInput1 = it },
+                        label = { Text("Enter Flag 1 name") },
+                        readOnly = isCorrect1,
+                        textStyle = TextStyle(color = if (isSubmitted && isCorrect1) Color.Green else if (isSubmitted && userInput1.isNotEmpty() && !isCorrect1) Color.Red else Color.Unspecified)
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    if (incorrectAttempts >= 3 && !isCorrect1) {
+                        Text(getCountryNameByCountryCode(countryCodes[0]), color = Color.Blue)
+                    }
+
+
+                    FlagImage(countryCode = countryCodes[1], modifier = Modifier.size(150.dp))
+                    OutlinedTextField(
+                        value = userInput2,
+                        onValueChange = { userInput2 = it },
+                        label = { Text("Enter Flag 2 name") },
+                        readOnly = isCorrect2,
+                        textStyle = TextStyle(color = if (isSubmitted && isCorrect2) Color.Green else if (isSubmitted && userInput2.isNotEmpty() && !isCorrect2) Color.Red else Color.Unspecified)
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    if (incorrectAttempts >= 3 && !isCorrect2) {
+                        Text(getCountryNameByCountryCode(countryCodes[1]), color = Color.Blue)
+                    }
+
+                    FlagImage(countryCode = countryCodes[2], modifier = Modifier.size(150.dp))
+                    OutlinedTextField(
+                        value = userInput3,
+                        onValueChange = { userInput3 = it },
+                        label = { Text("Enter Flag 3 name") },
+                        readOnly = isCorrect3,
+                        textStyle = TextStyle(color = if (isSubmitted && isCorrect3) Color.Green else if (isSubmitted && userInput3.isNotEmpty() && !isCorrect3) Color.Red else Color.Unspecified)
+                    )
+                    Spacer(modifier = Modifier.height(5.dp))
+
+                    if (incorrectAttempts >= 3 && !isCorrect3) {
+                        Text(getCountryNameByCountryCode(countryCodes[2]), color = Color.Blue)
+                    }
+
+                }
+                if (incorrectAttempts >= 3) {
+                    Text("WRONG!", color = Color.Red)
+                } else if (isSubmitted && isCorrect1 && isCorrect2 && isCorrect3) {
+                    Text("CORRECT!", color = Color.Green)
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                Button(onClick = {
+                    if (incorrectAttempts >= 3 || (isSubmitted && isCorrect1 && isCorrect2 && isCorrect3)) {
+                        // Reset the game and load new flags
+                        navController.navigate("screen4")
+                    } else {
+                        isSubmitted = true
+                        if (userInput1.equals(getCountryNameByCountryCode(countryCodes[0]), ignoreCase = true)) {
+                            isCorrect1 = true
+                        }
+                        if (userInput2.equals(getCountryNameByCountryCode(countryCodes[1]), ignoreCase = true)) {
+                            isCorrect2 = true
+                        }
+                        if (userInput3.equals(getCountryNameByCountryCode(countryCodes[2]), ignoreCase = true)) {
+                            isCorrect3 = true
+                        }
+                        if (!isCorrect1 || !isCorrect2 || !isCorrect3) {
+                            incorrectAttempts++
+                        }
+                    }
+                }) {
+                    Text(if (incorrectAttempts >= 3 || (isSubmitted && isCorrect1 && isCorrect2 && isCorrect3)) "Next" else "Submit")
                 }
             }
         }
