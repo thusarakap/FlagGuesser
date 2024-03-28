@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -42,8 +43,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,7 +57,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -62,21 +65,41 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.thusarakap.flagguesser.ui.theme.FlagGuesserTheme
 import kotlinx.coroutines.delay
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
+class MainViewModel : ViewModel() {
+    private val _switchState = MutableStateFlow(false)
+    val switchState: StateFlow<Boolean> = _switchState
 
+    fun saveSwitchState(state: Boolean) {
+        viewModelScope.launch {
+            _switchState.emit(state)
+        }
+    }
+}
 
 class MainActivity : ComponentActivity() {
+    private val viewModel: MainViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             FlagGuesserTheme {
                 val navController = rememberNavController()
+                val switchState by viewModel.switchState.collectAsState()
+
                 NavHost(navController, startDestination = "menu") {
-                    composable("menu") { MainMenu(navController) }
-                    composable("screen1") { Screen1(navController) }
-                    composable("screen2") { Screen2(navController) }
-                    composable("screen3") { Screen3(navController) }
-                    composable("screen4") { Screen4(navController) }
+                    composable("menu") { MainMenu(navController, switchState) { newState ->
+                        viewModel.saveSwitchState(newState)
+                    } }
+                    composable("screen1") { Screen1(navController, switchState) }
+                    composable("screen2") { Screen2(navController, switchState) }
+                    composable("screen3") { Screen3(navController, switchState) }
+                    composable("screen4") { Screen4(navController, switchState) }
                 }
             }
         }
@@ -105,9 +128,8 @@ fun TopBar(navController: NavHostController) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun MainMenu(navController: NavHostController) {
+fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchToggle: (Boolean) -> Unit) {
     val buttonWidth = 230.dp
-    var isSwitchOn by rememberSaveable { mutableStateOf(false) } // New state variable for the switch
 
     Scaffold(
         content = { _ ->
@@ -116,14 +138,10 @@ fun MainMenu(navController: NavHostController) {
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Switch UI
-                Switch(
-                    checked = isSwitchOn,
-                    onCheckedChange = { isChecked ->
-                        isSwitchOn = isChecked // Update switch state
-                    }
-                )
                 Text("Menu")
+
+                Switch(checked = switchState, onCheckedChange = onSwitchToggle)
+
                 Spacer(modifier = Modifier.height(30.dp))
                 Button(
                     onClick = { navController.navigate("screen1") },
@@ -196,7 +214,7 @@ fun getFlagImageByCountryCode(countryCode: String): Int {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen1(navController: NavHostController) {
+fun Screen1(navController: NavHostController, switchState: Boolean) {
     var selectedCountry by rememberSaveable { mutableStateOf("") }
     var countryNames by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var flagCountryCode by rememberSaveable { mutableStateOf("") }
@@ -205,6 +223,19 @@ fun Screen1(navController: NavHostController) {
     var wasPopupShown by rememberSaveable { mutableStateOf(false) }
     var resultPopupShown by rememberSaveable { mutableStateOf(false) }
 
+    var remainingTime by remember { mutableIntStateOf(10) }
+
+    LaunchedEffect(switchState) {
+        if (switchState) {
+            while (remainingTime > 0) {
+                delay(1000L)
+                remainingTime--
+            }
+            isCorrect = selectedCountry.equals(correctCountry, ignoreCase = true)
+            Log.d("Answer Comparison", "Selected: $selectedCountry, Correct: $correctCountry, Result: $isCorrect")
+            resultPopupShown = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         countryNames = loadCountryNames()
@@ -231,6 +262,12 @@ fun Screen1(navController: NavHostController) {
                 // Flag Image
                 FlagImage(countryCode = flagCountryCode, modifier = Modifier.size(225.dp))
                 Spacer(modifier = Modifier.height(10.dp))
+
+                if (switchState) {
+                    Text(text = "Timer: $remainingTime")
+                } else {
+                    Text(text = "Timer is off")
+                }
 
                 // Country List
                 if (countryNames.isNotEmpty()) {
@@ -358,15 +395,29 @@ fun loadCountryNames(): List<String> {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen2(navController: NavHostController) {
+fun Screen2(navController: NavHostController, switchState: Boolean) {
     var countryCode by rememberSaveable { mutableStateOf("") }
     var countryName by rememberSaveable { mutableStateOf("") }
     var dashes by rememberSaveable { mutableStateOf("") }
     var userInput by rememberSaveable { mutableStateOf("") }
-    var incorrectGuesses by rememberSaveable { mutableStateOf(0) }
+    var incorrectGuesses by rememberSaveable { mutableIntStateOf(0) }
     var resultMessage by rememberSaveable { mutableStateOf("") }
     var resultPopupShown by rememberSaveable { mutableStateOf(false) }
     var wasPopupShown by rememberSaveable { mutableStateOf(false) }
+
+    var remainingTime by remember { mutableIntStateOf(10) }
+
+    LaunchedEffect(switchState) {
+        if (switchState) {
+            while (remainingTime > 0) {
+                delay(1000L)
+                remainingTime--
+            }
+            resultMessage = "WRONG!"
+            resultPopupShown = true
+            wasPopupShown = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         // Generate a random flag country code and corresponding country name
@@ -428,6 +479,12 @@ fun Screen2(navController: NavHostController) {
                 FlagImage(countryCode = countryCode, modifier = Modifier.size(225.dp))
                 Spacer(modifier = Modifier.height(16.dp))
 
+                if (switchState) {
+                    Text(text = "Timer: $remainingTime")
+                } else {
+                    Text(text = "Timer is off")
+                }
+
                 // Dashes representing the country name
                 Text(text = dashes, style = TextStyle(fontSize = 24.sp))
                 Spacer(modifier = Modifier.height(16.dp))
@@ -469,12 +526,24 @@ fun Screen2(navController: NavHostController) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen3(navController: NavHostController) {
+fun Screen3(navController: NavHostController, switchState: Boolean) {
     var countryCodes by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var correctCountryCode by rememberSaveable { mutableStateOf("") }
     var correctCountryName by rememberSaveable { mutableStateOf("") }
     var hasAttempted by rememberSaveable { mutableStateOf(false) }
     var isCorrect by rememberSaveable { mutableStateOf(false) }
+
+    var remainingTime by remember { mutableIntStateOf(10) }
+
+    LaunchedEffect(switchState) {
+        if (switchState) {
+            while (remainingTime > 0) {
+                delay(1000L)
+                remainingTime--
+            }
+            hasAttempted = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (countryCodes.isEmpty()) {
@@ -504,6 +573,12 @@ fun Screen3(navController: NavHostController) {
                     text = correctCountryName,
                     style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 )
+
+                if (switchState) {
+                    Text(text = "Timer: $remainingTime")
+                } else {
+                    Text(text = "Timer is off")
+                }
 
                 countryCodes.forEach { countryCode ->
                     FlagImage(countryCode = countryCode, modifier = Modifier
@@ -537,7 +612,7 @@ fun Screen3(navController: NavHostController) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen4(navController: NavHostController) {
+fun Screen4(navController: NavHostController, switchState: Boolean) {
     var countryCodes by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var userInput1 by rememberSaveable { mutableStateOf("") }
     var userInput2 by rememberSaveable { mutableStateOf("") }
@@ -546,7 +621,26 @@ fun Screen4(navController: NavHostController) {
     var isCorrect2 by rememberSaveable { mutableStateOf(false) }
     var isCorrect3 by rememberSaveable { mutableStateOf(false) }
     var isSubmitted by rememberSaveable { mutableStateOf(false) }
-    var incorrectAttempts by rememberSaveable { mutableStateOf(0) } // New state variable
+    var incorrectAttempts by rememberSaveable { mutableIntStateOf(0) }
+
+    var remainingTime by remember { mutableIntStateOf(10) }
+
+    LaunchedEffect(switchState) {
+        if (switchState) {
+            while (remainingTime > 0) {
+                delay(1000L)
+                remainingTime--
+            }
+            // When the timer reaches 0, perform the same logic as clicking the submit button three times
+            if (incorrectAttempts < 3) {
+                incorrectAttempts = 3
+            }
+            isCorrect1 = userInput1.equals(getCountryNameByCountryCode(countryCodes[0]), ignoreCase = true)
+            isCorrect2 = userInput2.equals(getCountryNameByCountryCode(countryCodes[1]), ignoreCase = true)
+            isCorrect3 = userInput3.equals(getCountryNameByCountryCode(countryCodes[2]), ignoreCase = true)
+            isSubmitted = true
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (countryCodes.isEmpty()) {
@@ -568,6 +662,12 @@ fun Screen4(navController: NavHostController) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Spacer(modifier = Modifier.height(30.dp))
+
+                if (switchState) {
+                    Text(text = "Timer: $remainingTime")
+                } else {
+                    Text(text = "Timer is off")
+                }
 
                 if (countryCodes.size == 3) {
                     FlagImage(countryCode = countryCodes[0], modifier = Modifier.size(150.dp))
@@ -612,7 +712,6 @@ fun Screen4(navController: NavHostController) {
                     if (incorrectAttempts >= 3 && !isCorrect3) {
                         Text(getCountryNameByCountryCode(countryCodes[2]), color = Color.Blue)
                     }
-
                 }
                 if (incorrectAttempts >= 3) {
                     Text("WRONG!", color = Color.Red)
@@ -647,10 +746,3 @@ fun Screen4(navController: NavHostController) {
     )
 }
 
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    FlagGuesserTheme {
-        MainMenu(rememberNavController())
-    }
-}
