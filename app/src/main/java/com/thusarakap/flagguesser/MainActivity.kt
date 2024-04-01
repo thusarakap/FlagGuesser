@@ -24,7 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -47,7 +49,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -57,6 +58,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
@@ -142,7 +144,7 @@ fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchTog
 
                 Switch(checked = switchState, onCheckedChange = onSwitchToggle)
 
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(15.dp))
                 Button(
                     onClick = { navController.navigate("screen1") },
                     modifier = Modifier
@@ -223,7 +225,9 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
     var wasPopupShown by rememberSaveable { mutableStateOf(false) }
     var resultPopupShown by rememberSaveable { mutableStateOf(false) }
 
-    var remainingTime by remember { mutableIntStateOf(10) }
+    var remainingTime by rememberSaveable { mutableIntStateOf(10) }
+
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(switchState) {
         if (switchState) {
@@ -253,7 +257,9 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(scrollState),
+
                 verticalArrangement = Arrangement.Top,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -261,13 +267,14 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
 
                 // Flag Image
                 FlagImage(countryCode = flagCountryCode, modifier = Modifier.size(225.dp))
-                Spacer(modifier = Modifier.height(10.dp))
 
                 if (switchState) {
                     Text(text = "Timer: $remainingTime")
                 } else {
                     Text(text = "Timer is off")
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Country List
                 if (countryNames.isNotEmpty()) {
@@ -280,7 +287,7 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(30.dp))
+                    Spacer(modifier = Modifier.height(25.dp))
                 } else {
                     // Show loading indicator or placeholder
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
@@ -405,7 +412,9 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
     var resultPopupShown by rememberSaveable { mutableStateOf(false) }
     var wasPopupShown by rememberSaveable { mutableStateOf(false) }
 
-    var remainingTime by remember { mutableIntStateOf(10) }
+    var remainingTime by rememberSaveable { mutableIntStateOf(10) }
+
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(switchState) {
         if (switchState) {
@@ -471,13 +480,16 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
         topBar = { TopBar(navController) },
         content = {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Flag Image
                 FlagImage(countryCode = countryCode, modifier = Modifier.size(225.dp))
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(1.dp))
 
                 if (switchState) {
                     Text(text = "Timer: $remainingTime")
@@ -485,8 +497,11 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
                     Text(text = "Timer is off")
                 }
 
+                Spacer(modifier = Modifier.height(10.dp))
+
                 // Dashes representing the country name
                 Text(text = dashes, style = TextStyle(fontSize = 24.sp))
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Textbox for user input
@@ -495,8 +510,9 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
                     onValueChange = { userInput = it },
                     label = { Text("Enter a character") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.width(350.dp)
                 )
+
                 Spacer(modifier = Modifier.height(16.dp))
 
                 val buttonText = if (wasPopupShown) "Next" else "Submit"
@@ -533,7 +549,9 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
     var hasAttempted by rememberSaveable { mutableStateOf(false) }
     var isCorrect by rememberSaveable { mutableStateOf(false) }
 
-    var remainingTime by remember { mutableIntStateOf(10) }
+    var remainingTime by rememberSaveable { mutableIntStateOf(10) }
+
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(switchState) {
         if (switchState) {
@@ -564,15 +582,19 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
         topBar = { TopBar(navController) },
         content = {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(50.dp))
                 Text(
                     text = correctCountryName,
                     style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 )
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 if (switchState) {
                     Text(text = "Timer: $remainingTime")
@@ -600,7 +622,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
                     Spacer(modifier = Modifier.height(22.dp))
                 }
 
-                Spacer(modifier = Modifier.height(15.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Button(onClick = { navController.navigate("screen3") }) {
                     Text("Next")
@@ -623,7 +645,9 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
     var isSubmitted by rememberSaveable { mutableStateOf(false) }
     var incorrectAttempts by rememberSaveable { mutableIntStateOf(0) }
 
-    var remainingTime by remember { mutableIntStateOf(10) }
+    var remainingTime by rememberSaveable { mutableIntStateOf(10) }
+
+    val scrollState = rememberScrollState()
 
     LaunchedEffect(switchState) {
         if (switchState) {
@@ -657,11 +681,13 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
         topBar = { TopBar(navController) },
         content = {
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(30.dp))
+                Spacer(modifier = Modifier.height(60.dp))
 
                 if (switchState) {
                     Text(text = "Timer: $remainingTime")
@@ -678,6 +704,7 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
                         readOnly = isCorrect1,
                         textStyle = TextStyle(color = if (isSubmitted && isCorrect1) Color.Green else if (isSubmitted && userInput1.isNotEmpty() && !isCorrect1) Color.Red else Color.Unspecified)
                     )
+
                     Spacer(modifier = Modifier.height(5.dp))
 
                     if (incorrectAttempts >= 3 && !isCorrect1) {
@@ -746,3 +773,47 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
     )
 }
 
+@Preview(showBackground = true)
+@Composable
+fun MainMenuPreview() {
+    FlagGuesserTheme {
+        val navController = rememberNavController()
+        MainMenu(navController, false) { }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun Screen1Preview() {
+    FlagGuesserTheme {
+        val navController = rememberNavController()
+        Screen1(navController, false)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun Screen2Preview() {
+    FlagGuesserTheme {
+        val navController = rememberNavController()
+        Screen2(navController, false)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun Screen3Preview() {
+    FlagGuesserTheme {
+        val navController = rememberNavController()
+        Screen3(navController, false)
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun Screen4Preview() {
+    FlagGuesserTheme {
+        val navController = rememberNavController()
+        Screen4(navController, false)
+    }
+}
