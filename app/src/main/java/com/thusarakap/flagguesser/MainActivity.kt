@@ -98,10 +98,10 @@ class MainActivity : ComponentActivity() {
                     composable("menu") { MainMenu(navController, switchState) { newState ->
                         viewModel.saveSwitchState(newState)
                     } }
-                    composable("screen1") { Screen1(navController, switchState) }
-                    composable("screen2") { Screen2(navController, switchState) }
-                    composable("screen3") { Screen3(navController, switchState) }
-                    composable("screen4") { Screen4(navController, switchState) }
+                    composable("guessTheCountryRoute") { GuessTheCountry(navController, switchState) }
+                    composable("guessHintsRoute") { GuessHints(navController, switchState) }
+                    composable("guessTheFlagRoute") { GuessTheFlag(navController, switchState) }
+                    composable("advancedLevelRoute") { AdvancedLevel(navController, switchState) }
                 }
             }
         }
@@ -133,20 +133,38 @@ fun TopBar(navController: NavHostController) {
 fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchToggle: (Boolean) -> Unit) {
     val buttonWidth = 230.dp
 
+    val scrollState = rememberScrollState()
+
     Scaffold(
         content = { _ ->
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp)
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Menu")
+                Text(
+                    text = "FlagGuesser",
+                    style = TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Bold),
+                )
+
+                Spacer(modifier = Modifier.height(25.dp))
+
+                Text(
+                    text = "Menu",
+                    style = TextStyle(fontSize = 30.sp),
+                )
+
+
+                Spacer(modifier = Modifier.height(30.dp))
 
                 Switch(checked = switchState, onCheckedChange = onSwitchToggle)
 
-                Spacer(modifier = Modifier.height(15.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Button(
-                    onClick = { navController.navigate("screen1") },
+                    onClick = { navController.navigate("guessTheCountryRoute") },
                     modifier = Modifier
                         .width(buttonWidth)
                         .padding(vertical = 8.dp)
@@ -154,7 +172,7 @@ fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchTog
                     Text("Guess the Country")
                 }
                 Button(
-                    onClick = { navController.navigate("screen2") },
+                    onClick = { navController.navigate("guessHintsRoute") },
                     modifier = Modifier
                         .width(buttonWidth)
                         .padding(vertical = 8.dp)
@@ -162,7 +180,7 @@ fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchTog
                     Text("Guess-Hints")
                 }
                 Button(
-                    onClick = { navController.navigate("screen3") },
+                    onClick = { navController.navigate("guessTheFlagRoute") },
                     modifier = Modifier
                         .width(buttonWidth)
                         .padding(vertical = 8.dp)
@@ -170,7 +188,7 @@ fun MainMenu(navController: NavHostController, switchState: Boolean, onSwitchTog
                     Text("Guess the Flag")
                 }
                 Button(
-                    onClick = { navController.navigate("screen4") },
+                    onClick = { navController.navigate("advancedLevelRoute") },
                     modifier = Modifier
                         .width(buttonWidth)
                         .padding(vertical = 8.dp)
@@ -203,20 +221,20 @@ fun getFlagImageByCountryCode(countryCode: String): Int {
             } catch (e: Exception) {
                 // Handle the case where the drawable is not found
                 Log.e("FlagImageDebug", "Error retrieving drawable resource ID: ${e.message}")
-                R.drawable.gb // Default flag resource ID
+                R.drawable.gb // Default flag
             }
             resourceId
         }
         else -> {
             Log.d("FlagImageDebug", "Country code not found in map: $countryCodeUpperCase")
-            R.drawable.gb // Default flag resource ID
+            R.drawable.gb // Default flag
         }
     }
 }
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen1(navController: NavHostController, switchState: Boolean) {
+fun GuessTheCountry(navController: NavHostController, switchState: Boolean) {
     var selectedCountry by rememberSaveable { mutableStateOf("") }
     var countryNames by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var flagCountryCode by rememberSaveable { mutableStateOf("") }
@@ -229,6 +247,7 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
 
     val scrollState = rememberScrollState()
 
+    // Timer logic
     LaunchedEffect(switchState) {
         if (switchState) {
             while (remainingTime > 0) {
@@ -241,6 +260,7 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
         }
     }
 
+    // Load the country names and a random flag country code
     LaunchedEffect(Unit) {
         countryNames = loadCountryNames()
         if (flagCountryCode.isEmpty()) {
@@ -269,9 +289,15 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
                 FlagImage(countryCode = flagCountryCode, modifier = Modifier.size(225.dp))
 
                 if (switchState) {
-                    Text(text = "Timer: $remainingTime")
+                    Text(
+                        text = "Timer: $remainingTime",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 } else {
-                    Text(text = "Timer is off")
+                    Text(
+                        text = "Timer is off",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -287,9 +313,9 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(25.dp))
+                    Spacer(modifier = Modifier.height(30.dp))
                 } else {
-                    // Show loading indicator or placeholder
+                    // Show loading circle
                     CircularProgressIndicator(modifier = Modifier.padding(vertical = 16.dp))
                 }
 
@@ -297,11 +323,10 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
                 Button(onClick = {
                     if (wasPopupShown) {
                         // Load a new flag and continue the game
-                        navController.navigate("screen1")
+                        navController.navigate("guessTheCountryRoute")
                         isCorrect = null
                         wasPopupShown = false
                     } else {
-                        // Inside the onClick lambda of the submit button
                         isCorrect = selectedCountry.equals(correctCountry, ignoreCase = true)
                         Log.d("Answer Comparison", "Selected: $selectedCountry, Correct: $correctCountry, Result: $isCorrect")
                         resultPopupShown = true
@@ -318,11 +343,11 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
                         // Show the result popup for 2 seconds
                         delay(2000)
                         resultPopupShown = false
-                        wasPopupShown = true // Set the state to indicate that the popup was shown
+                        wasPopupShown = true
                     }
                     ResultPopup(isCorrect ?: false, correctCountry) {
                         resultPopupShown = false
-                        wasPopupShown = true // Update the flag when the popup closes
+                        wasPopupShown = true
                     }
                 }
             }
@@ -330,13 +355,14 @@ fun Screen1(navController: NavHostController, switchState: Boolean) {
     )
 }
 
+// Result popup
 @Composable
 fun ResultPopup(isCorrect: Boolean, correctCountry: String?, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = { onDismiss() },
         title = {
             Text(
-                text = if (isCorrect) "CORRECT!" else "INCORRECT!",
+                text = if (isCorrect) "CORRECT!" else "WRONG!",
                 color = if (isCorrect) Color.Green else Color.Red
             )
         },
@@ -350,16 +376,17 @@ fun ResultPopup(isCorrect: Boolean, correctCountry: String?, onDismiss: () -> Un
             }
         },
         confirmButton = {
-            // No confirm button
+            // Hide confirm button
         }
     )
 }
 
-
+// Map of country codes to country names
 fun getCountryNameByCountryCode(countryCode: String): String {
     return CountryCodeMap.codeToNameMap[countryCode] ?: "Unknown"
 }
 
+// Generate a random country code
 fun getRandomFlagCountryCode(): String {
     val countryCodes = CountryCodeMap.codeToNameMap.keys.toList()
     val randomCountryCode = countryCodes.random()
@@ -368,6 +395,7 @@ fun getRandomFlagCountryCode(): String {
     return randomCountryCode
 }
 
+// List item customisation and selection for the country list
 @Composable
 fun CountryListItem(
     countryName: String,
@@ -375,7 +403,7 @@ fun CountryListItem(
     onCountrySelected: (String) -> Unit
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp), // Set rounded corners
+        shape = RoundedCornerShape(8.dp), // Set rounded corners for the selected name
         color = if (countryName == selectedCountry) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else MaterialTheme.colorScheme.surface,
     ) {
         Row(
@@ -394,6 +422,7 @@ fun CountryListItem(
     }
 }
 
+// Load the country names from the map
 fun loadCountryNames(): List<String> {
     val countryNames = CountryCodeMap.codeToNameMap.values.toList()
     Log.d("CountryNamesDebug", "Loaded country names: $countryNames")
@@ -402,7 +431,7 @@ fun loadCountryNames(): List<String> {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen2(navController: NavHostController, switchState: Boolean) {
+fun GuessHints(navController: NavHostController, switchState: Boolean) {
     var countryCode by rememberSaveable { mutableStateOf("") }
     var countryName by rememberSaveable { mutableStateOf("") }
     var dashes by rememberSaveable { mutableStateOf("") }
@@ -416,15 +445,54 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
 
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(switchState) {
+    // Timer logic with rest for re-run once submitted
+    var timerReset by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(switchState, timerReset) {
         if (switchState) {
             while (remainingTime > 0) {
                 delay(1000L)
                 remainingTime--
             }
-            resultMessage = "WRONG!"
-            resultPopupShown = true
-            wasPopupShown = true
+            val inputChar = userInput.uppercase().firstOrNull() ?: return@LaunchedEffect
+
+            // Convert the country name and dashes to char arrays for easy manipulation
+            val countryNameChars = countryName.uppercase().toCharArray()
+            val dashesChars = dashes.replace(" ", "").toCharArray()
+
+            var isGuessCorrect = false
+
+            // Iterate over the country name characters
+            for (i in countryNameChars.indices) {
+                // If the current character is equal to the user input, replace the corresponding dash
+                if (countryNameChars[i] == inputChar) {
+                    dashesChars[i] = inputChar
+                    isGuessCorrect = true
+                }
+            }
+
+            // Convert the dashes char array back to a string with spaces between each character
+            dashes = dashesChars.joinToString(" ")
+
+            if (!isGuessCorrect) {
+                incorrectGuesses++
+            }
+
+            if (incorrectGuesses >= 3) {
+                resultMessage = "WRONG!"
+                resultPopupShown = true
+                wasPopupShown = true
+            } else if (!dashes.contains('-')) {
+                resultMessage = "CORRECT!"
+                resultPopupShown = true
+                wasPopupShown = true
+            }
+            // Reset the timer and change the value of timerReset to trigger a re-composition
+            if (!wasPopupShown) {
+                remainingTime = 10
+                timerReset = !timerReset
+            }
+
         }
     }
 
@@ -443,7 +511,7 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
         // Convert the user input to uppercase to make the comparison case-insensitive
         val inputChar = userInput.uppercase().firstOrNull() ?: return
 
-        // Convert the country name and dashes to char arrays for easy manipulation
+        // Convert the country name and dashes to char arrays
         val countryNameChars = countryName.uppercase().toCharArray()
         val dashesChars = dashes.replace(" ", "").toCharArray()
 
@@ -474,6 +542,8 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
             resultPopupShown = true
             wasPopupShown = true
         }
+        remainingTime = 10
+        timerReset = !timerReset
     }
 
     Scaffold(
@@ -492,9 +562,15 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
                 Spacer(modifier = Modifier.height(1.dp))
 
                 if (switchState) {
-                    Text(text = "Timer: $remainingTime")
+                    Text(
+                        text = "Timer: $remainingTime",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 } else {
-                    Text(text = "Timer is off")
+                    Text(
+                        text = "Timer is off",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
@@ -521,7 +597,7 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
                 Button(onClick = {
                     if (wasPopupShown) {
                         // Reset the game and load a new flag
-                        navController.navigate("screen2")
+                        navController.navigate("guessHintsRoute")
                     } else {
                         handleSubmit(userInput)
                     }
@@ -542,7 +618,7 @@ fun Screen2(navController: NavHostController, switchState: Boolean) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen3(navController: NavHostController, switchState: Boolean) {
+fun GuessTheFlag(navController: NavHostController, switchState: Boolean) {
     var countryCodes by rememberSaveable { mutableStateOf<Set<String>>(emptySet()) }
     var correctCountryCode by rememberSaveable { mutableStateOf("") }
     var correctCountryName by rememberSaveable { mutableStateOf("") }
@@ -553,6 +629,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
 
     val scrollState = rememberScrollState()
 
+    // Timer logic
     LaunchedEffect(switchState) {
         if (switchState) {
             while (remainingTime > 0) {
@@ -563,6 +640,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
         }
     }
 
+    // Generate the country codes and the correct country code
     LaunchedEffect(Unit) {
         if (countryCodes.isEmpty()) {
             val generatedCountryCodes = mutableSetOf<String>()
@@ -597,9 +675,15 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (switchState) {
-                    Text(text = "Timer: $remainingTime")
+                    Text(
+                        text = "Timer: $remainingTime",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 } else {
-                    Text(text = "Timer is off")
+                    Text(
+                        text = "Timer is off",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 }
 
                 countryCodes.forEach { countryCode ->
@@ -615,7 +699,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
 
                 if (hasAttempted) {
                     Text(
-                        text = if (isCorrect) "CORRECT!" else "INCORRECT!",
+                        text = if (isCorrect) "CORRECT!" else "WRONG!",
                         color = if (isCorrect) Color.Green else Color.Red
                     )
                 } else {
@@ -624,7 +708,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                Button(onClick = { navController.navigate("screen3") }) {
+                Button(onClick = { navController.navigate("guessTheFlagRoute") }) {
                     Text("Next")
                 }
             }
@@ -634,7 +718,7 @@ fun Screen3(navController: NavHostController, switchState: Boolean) {
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun Screen4(navController: NavHostController, switchState: Boolean) {
+fun AdvancedLevel(navController: NavHostController, switchState: Boolean) {
     var countryCodes by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
     var userInput1 by rememberSaveable { mutableStateOf("") }
     var userInput2 by rememberSaveable { mutableStateOf("") }
@@ -649,23 +733,45 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
 
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(switchState) {
+    var timerReset by rememberSaveable { mutableStateOf(false) }
+
+    // Function to check the answers
+    fun checkAnswers() {
+        isSubmitted = true
+        if (userInput1.equals(getCountryNameByCountryCode(countryCodes[0]), ignoreCase = true)) {
+            isCorrect1 = true
+        }
+        if (userInput2.equals(getCountryNameByCountryCode(countryCodes[1]), ignoreCase = true)) {
+            isCorrect2 = true
+        }
+        if (userInput3.equals(getCountryNameByCountryCode(countryCodes[2]), ignoreCase = true)) {
+            isCorrect3 = true
+        }
+        if (!isCorrect1 || !isCorrect2 || !isCorrect3) {
+            incorrectAttempts++
+
+        }
+        if (incorrectAttempts < 3) {
+            remainingTime = 10
+            timerReset = !timerReset
+        }
+    }
+
+    // Timer logic
+    LaunchedEffect(switchState, timerReset) {
         if (switchState) {
             while (remainingTime > 0) {
                 delay(1000L)
                 remainingTime--
             }
-            // When the timer reaches 0, perform the same logic as clicking the submit button three times
-            if (incorrectAttempts < 3) {
-                incorrectAttempts = 3
-            }
-            isCorrect1 = userInput1.equals(getCountryNameByCountryCode(countryCodes[0]), ignoreCase = true)
-            isCorrect2 = userInput2.equals(getCountryNameByCountryCode(countryCodes[1]), ignoreCase = true)
-            isCorrect3 = userInput3.equals(getCountryNameByCountryCode(countryCodes[2]), ignoreCase = true)
-            isSubmitted = true
+            // When the timer reaches 0, perform the same logic as clicking the submit button
+            checkAnswers()
+
+
         }
     }
 
+    // Generate 3 country codes
     LaunchedEffect(Unit) {
         if (countryCodes.isEmpty()) {
             val generatedCountryCodes = mutableSetOf<String>()
@@ -690,9 +796,15 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
                 Spacer(modifier = Modifier.height(60.dp))
 
                 if (switchState) {
-                    Text(text = "Timer: $remainingTime")
+                    Text(
+                        text = "Timer: $remainingTime",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 } else {
-                    Text(text = "Timer is off")
+                    Text(
+                        text = "Timer is off",
+                        style = TextStyle(fontWeight = FontWeight.Bold),
+                    )
                 }
 
                 if (countryCodes.size == 3) {
@@ -749,21 +861,9 @@ fun Screen4(navController: NavHostController, switchState: Boolean) {
                 Button(onClick = {
                     if (incorrectAttempts >= 3 || (isSubmitted && isCorrect1 && isCorrect2 && isCorrect3)) {
                         // Reset the game and load new flags
-                        navController.navigate("screen4")
+                        navController.navigate("advancedLevelRoute")
                     } else {
-                        isSubmitted = true
-                        if (userInput1.equals(getCountryNameByCountryCode(countryCodes[0]), ignoreCase = true)) {
-                            isCorrect1 = true
-                        }
-                        if (userInput2.equals(getCountryNameByCountryCode(countryCodes[1]), ignoreCase = true)) {
-                            isCorrect2 = true
-                        }
-                        if (userInput3.equals(getCountryNameByCountryCode(countryCodes[2]), ignoreCase = true)) {
-                            isCorrect3 = true
-                        }
-                        if (!isCorrect1 || !isCorrect2 || !isCorrect3) {
-                            incorrectAttempts++
-                        }
+                        checkAnswers()
                     }
                 }) {
                     Text(if (incorrectAttempts >= 3 || (isSubmitted && isCorrect1 && isCorrect2 && isCorrect3)) "Next" else "Submit")
@@ -784,36 +884,36 @@ fun MainMenuPreview() {
 
 @Preview(showBackground = true)
 @Composable
-fun Screen1Preview() {
+fun GuessTheCountryPreview() {
     FlagGuesserTheme {
         val navController = rememberNavController()
-        Screen1(navController, false)
+        GuessTheCountry(navController, false)
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun Screen2Preview() {
+fun GuessHintsPreview() {
     FlagGuesserTheme {
         val navController = rememberNavController()
-        Screen2(navController, false)
+        GuessHints(navController, false)
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun Screen3Preview() {
+fun GuessTheFlagPreview() {
     FlagGuesserTheme {
         val navController = rememberNavController()
-        Screen3(navController, false)
+        GuessTheFlag(navController, false)
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-fun Screen4Preview() {
+fun AdvancedLevelPreview() {
     FlagGuesserTheme {
         val navController = rememberNavController()
-        Screen4(navController, false)
+        AdvancedLevel(navController, false)
     }
 }
